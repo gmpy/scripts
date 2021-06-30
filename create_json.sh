@@ -71,7 +71,6 @@ is_end()
 # out: /path/for@json/node:bool:value
 move_next()
 {
-    is_end $1 && return 1
     echo $1 | sed 's#\(.*\)@\([^/]*\)/\(.*\)#\1/\2@\3#'
 }
 
@@ -171,33 +170,42 @@ sjson_create_do() {
     done
 
     # draw json
-    local elist clist cnt next
+    local val cnt
     for trunk in ${trunks}
     do
-        draw_indent ${depth} && echo "\"${trunk}\" : {"
-
-        trunk="$(echo ${trunk} | sed 's/[^ [:alnum:]]/_/g')"
-        for branch in $(eval "echo \${${trunk}}")
-        do
-            next="$(move_next ${branch})"
-            if is_end ${next}; then
-                elist="${elist} ${next}"
-            else
-                clist="${clist} ${next}"
-            fi
-        done
-        [ -n "${elist}" ] && draw_item \
-            $([ -n "${clist}" ] && echo c || echo e) \
-            $(( ${depth} + 1 )) ${elist}
-        [ -n "${clist}" ] && sjson_create_do $(( ${depth} + 1 )) ${clist}
-
         cnt=$(( ${cnt} + 1 ))
-        if [ "${cnt}" -lt "${trunks_cnt}" ]; then
-            draw_indent ${depth} && echo "},"
+        val="$(echo ${trunk} | sed 's/[^ [:alnum:]]/_/g')"
+        val="$(eval "echo \${${val}}")"
+        if is_end ${val}; then
+            draw_item \
+                $([ "${cnt}" -lt "${trunks_cnt}" ] && echo c || echo e) \
+                ${depth} ${val}
         else
-            draw_indent ${depth} && echo "}"
+            local elist clist next
+            draw_indent ${depth} && echo "\"${trunk}\" : {"
+
+            for branch in ${val}
+            do
+                next="$(move_next ${branch})"
+                if is_end ${next}; then
+                    elist="${elist} ${next}"
+                else
+                    clist="${clist} ${next}"
+                fi
+            done
+            [ -n "${elist}" ] && draw_item \
+                $([ -n "${clist}" ] && echo c || echo e) \
+                $(( ${depth} + 1 )) ${elist}
+            [ -n "${clist}" ] && sjson_create_do $(( ${depth} + 1 )) ${clist}
+
+            if [ "${cnt}" -lt "${trunks_cnt}" ]; then
+                draw_indent ${depth} && echo "},"
+            else
+                draw_indent ${depth} && echo "}"
+            fi
+            unset clist elist
         fi
-        unset clist elist
+
     done
 }
 
